@@ -1,2 +1,3 @@
 from Cluster.SpectralCluster import cluster
-from Cluster.FeatureExtraction import feature_extract
+from Cluster.KNN import KNN
+from Cluster.KNN import loadKNN

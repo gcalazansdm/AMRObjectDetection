@@ -9,12 +9,17 @@ for r, d, f in os.walk(bkground_folder):
 	for file in f:
 		bkground.append(os.path.join(r, file))
 
+bkground_folder = '/home/calazans/Downloads/Background/'
+for r, d, f in os.walk(bkground_folder):
+	for file in f:
+		bkground.append(os.path.join(r, file))
+		
 imgs_folder = '/home/calazans/Downloads/Documentos/'
 imgs = []
 for r, d, f in os.walk(imgs_folder):
 	for file in f:
 		imgs.append(os.path.join(r, file))
-res_folder = '/home/calazans/Downloads/temp/'
+res_folder = '/home/calazans/Downloads/lol/imgs'
 
 def resize(img,w,h,prop):
     height, width = img.shape[:2]
@@ -71,26 +76,27 @@ def add(imageA,imageB, pos):
         imageA[y:maxY+y, x:maxX+x,  c] = alpha_s * imageB[:maxY, :maxX, c] + alpha_l*imageA[y:maxY+y, x:maxX+x, c]
     return imageA,imageC, test
 i =0
-total = len(imgs)*len(bkground)
-for img_path in imgs:
-    img = cv2.imread(img_path)
-    for back in bkground:
-        print(i,total)
-        i+=1
-        bk = cv2.imread(back)
-        (h, w) = bk.shape[:2]
-        img = rotate_bound(to_RGBA(img), random.random()*360)
-        border = max(w,h)*0.1
-        img = resize(img, w-border, h-border, max(min(random.random(),0.5),1.0))
-        (h2, w2) = img.shape[:2]
-        pos = (max(round(random.random()*(w - w2)),1),max(round(random.random()*(h- h2)),1))
-        img2,gt,test = add(bk,img,pos)
-        if(not test):
-            act = os.path.join(res_folder,str(i//100))
-        else:
-            act = os.path.join(os.path.join(res_folder,"erro"),str(i//10))
-        if not os.path.exists(act):
-            os.makedirs(act)
-        thres, gt = cv2.threshold(gt, 127, 255, cv2.THRESH_BINARY_INV)
-        cv2.imwrite(os.path.join(act,str(i)+'.png'),to_RGBA(img2))
-        cv2.imwrite(os.path.join(act,str(i)+'_gt.png'),to_RGBA(gt))
+for i in range(0,100):
+	img_path = random.choice(imgs)
+	back = random.choice(bkground)
+	img = cv2.imread(img_path)
+	print(i,100)
+	i+=1
+	bk = cv2.imread(back)
+	(h, w) = bk.shape[:2]
+	img = rotate_bound(to_RGBA(img), random.random()*360)
+	border = max(w,h)*0.1
+	img = resize(img, w-border, h-border, max(min(random.random(),0.5),1.0))
+	(h2, w2) = img.shape[:2]
+	pos = (max(round(random.random()*(w - w2)),1),max(round(random.random()*(h- h2)),1))
+	img2,gt,test = add(bk,img,pos)
+	if(not test):
+		act = res_folder
+	else:
+		act = os.path.join(res_folder,"erro")
+	if not os.path.exists(act):
+		os.makedirs(act)
+	thres, gt = cv2.threshold(gt, 127, 255, cv2.THRESH_BINARY_INV)
+	cv2.imwrite(os.path.join(act,str(i)+'.png'),to_RGBA(img2))
+	#cv2.imwrite(os.path.join(act,str(i)+'_gt.png'),to_RGBA(gt))
+

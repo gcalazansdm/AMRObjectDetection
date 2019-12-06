@@ -3,6 +3,11 @@ import os
 import cv2
 from skimage import color
 
+def toInt8(img):
+    info = normalize(img)
+    data = 255 * info  # Now scale by 255
+    img2 = data.astype(np.uint8)
+    return img2
 def normalize(array):
     min_val = np.min(array)
     temp_val = array - min_val
@@ -10,7 +15,11 @@ def normalize(array):
     if(max_val != 0):
         temp_val = temp_val / max_val
     return temp_val
-
+def getDir(maindir,newdir):
+    dir = os.path.join(maindir,newdir)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    return dir
 def print_(img):
     print(np.max(img),np.min(img))
 

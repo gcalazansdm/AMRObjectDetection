@@ -1,6 +1,14 @@
 import cv2
 import  numpy as np
 
+def close(mask,kernel):
+    erode = cv2.dilate(mask, kernel)
+    return cv2.erode(erode, kernel)
+
+def opening(mask,kernel):
+    erode = cv2.erode(mask, kernel)
+    return cv2.dilate(erode, kernel)
+
 def dilatate(mask,kernel):
     return cv2.dilate(mask,kernel)
 
