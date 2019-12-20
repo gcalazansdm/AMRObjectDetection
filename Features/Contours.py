@@ -25,5 +25,5 @@ def findContours(img):
     epsilon = 0.1 * cv2.arcLength(hull, True)
     approx = cv2.approxPolyDP(hull, epsilon, True)
 
-    cv2.drawContours(canvas, [approx], -1, (255, 255, 255), 3)
+    cv2.drawContours(canvas, [approx], -1, (255, 0, 0), 3)
     return canvas

@@ -7,90 +7,101 @@ import Features
 import threading
 
 def message(text):
-    print(text)
+    pass#print(text)
 
 lock = threading.Lock()
+def preprocess(mask,h,temp_dir,img,num_clusters,prefix):
+    binary_img = None
+    Utils.saveImg(os.path.join(temp_dir, "0_"+str(prefix)+"_img.png"), img)
 
-def pipeline(h,img,mask):
-    print("Thread", h)
-    global rImg
-    global lock
-    temp_dir = Utils.getDir(dir, str(h))
     mask_reconstructed = Morfology.reconstructionAdaptative(mask, h)
+    Utils.saveImg(os.path.join(temp_dir, "0_"+str(prefix)+"_mask_reconstructed.png"), mask_reconstructed)
+
     message("mask_reconstructed")
 
     markers = Morfology.seeds(img, mask_reconstructed)
+    message("seeds")
     mean = Features.mean(img, markers)
     message("mean")
 
     if len(mean) > 0 and mean is not None:
-        groups = Cluster.cluster(mean, min(5, mean.shape[0]))
-        img_dil = Morfology.dilatate(img, Utils.getKernel((3, 3)))
-        message("dil")
-
-        new_mask = img_dil.copy()
-
+        if (mean.shape[0] >= 2):
+            groups = Cluster.cluster(mean, min(num_clusters, mean.shape[0]))
+        else:
+            groups = markers
         num_seeds = np.max(markers)
+
+        nImgs = img.copy()
         for i in range(0, num_seeds):
-            new_mask[markers == i] *= groups[i]
+            nImgs[markers == i] = [255 // (groups[i] + 1), 255 // (groups[i] + 1), 255 // (groups[i] + 1)]
         message("new_mask")
 
-        mask2 = Utils.getMask(new_mask)
-        mask2_reconstructed = Morfology.reconstructionAdaptative(mask2, h)
-        markers = Morfology.seeds(img, mask2_reconstructed)
-        message("markers")
+        # new_mask = Morfology.dilatate(new_mask, Utils.getKernel((3, 3)))
+        message("Em " + str(h) + " há " + str(num_seeds) + " grupos")
+        Utils.saveImg(os.path.join(temp_dir, str(prefix)+"_new_mask.png"), nImgs)
 
-        message("Em " + str(h)+ " há "+str(num_seeds)+ " sementes")
-        nImgs = Utils.makeMarkers(img, markers, num_seeds)
-        Utils.saveImg(os.path.join(temp_dir, "1_binary_img.png"), nImgs)
         message("nImgs")
-        binary_img = Utils.binarize(nImgs)
+        grayImage = Utils.to_gray(nImgs)
+        binary_img = Utils.binarize_otsu(grayImage)
+        print(binary_img.dtype)
+        Utils.saveImg(os.path.join(temp_dir, "1_"+str(prefix-2)+"_binary_img.png"), binary_img)
+
+    return binary_img
+def pipeline(h,img,mask):
+    print("Thread", h)
+    global rImg
+    global lock
+
+    temp_dir = Utils.getDir(dir, str(h))
+    binary_img = preprocess(mask,h,temp_dir,img,2,2)
+    if binary_img is not None:
+
         Utils.saveImg(os.path.join(temp_dir, "2_binary_img.png"), binary_img)
-        message("binary_img")
-        if True:#Features.density(binary_img) < 0.7:
-            nImgs = Morfology.opening(binary_img, Utils.getKernel((3, 3)))
-            Utils.saveImg(os.path.join(temp_dir, "3_nImgs.png"), nImgs)
-            message("nImgs")
 
-            nImgs_border, pos = Utils.mkborder(nImgs)
-            Utils.saveImg(os.path.join(temp_dir, "4_nImgs_border.png"), nImgs_border)
 
-            nImgs_fill = Utils.fill(nImgs_border)
-            Utils.saveImg(os.path.join(temp_dir, "5_img_fill.png"), nImgs_fill)
+        nImgs = Morfology.opening(binary_img, Utils.getKernel((3, 3)))
+        nImgs = Morfology.close(nImgs, Utils.getKernel((3, 3)))
+        Utils.saveImg(os.path.join(temp_dir, "3_nImgs.png"), nImgs)
+        message("nImgs")
 
-            nImgs_border = Utils.sub(nImgs_border, nImgs_fill)
-            Utils.saveImg(os.path.join(temp_dir, "6_img_fill_xor.png"), nImgs_border)
+        nImgs_fill = Utils.multiFill(nImgs)
+        Utils.saveImg(os.path.join(temp_dir, "5_img_fill.png"), nImgs_fill)
 
-            nImgs_crop = Utils.crop(nImgs_border, pos)
-            Utils.saveImg(os.path.join(temp_dir, "7_nImgs_crop.png"), nImgs_crop)
+        nImgs_border = Utils.sub(nImgs, nImgs_fill)
+        Utils.saveImg(os.path.join(temp_dir, "6_img_fill_xor.png"), nImgs_border)
 
-            imgs_filtred = Utils.removeSmallComponents(nImgs_crop)
-            Utils.saveImg(os.path.join(temp_dir, "8_clear.png"), imgs_filtred)
-            with lock:
-                rImg = Utils.img_and(rImg, imgs_filtred)
-                Utils.saveImg(os.path.join(temp_dir, "9_clear.png"), rImg)
+        imgs_filtred = Utils.removeSmallComponents(nImgs_border)
+        Utils.saveImg(os.path.join(temp_dir, "8_clear.png"), imgs_filtred)
+        with lock:
+            img_normalized = Utils.normalize(imgs_filtred)
+            rImg = Utils.img_and(rImg, img_normalized)
+            Utils.saveImg(os.path.join(temp_dir, "9_clear.png"), rImg * 255)
+
     print("Fim thread",h)
 
-backgrounds = Utils.loadAll('/home/calazans/Downloads/lol/imgs')
+backgrounds = Utils.loadAll('/home/calazans/Documents/Images_pdi/imgs/img/')
 classifier = Cluster.loadKNN()
 has = 0
 
-parameters = [2,3, 4, 5,6,7,8,9,10,11,12,13,14,15,16]
+parameters = [2, 3]#, 5,6,7,8,9,10,11,12,13,14,15,16]
 for img_path in backgrounds:
+    print(img_path)
     has += 1
-
+    #print(img_path)
     img = Utils.loadImg(img_path)
-
+    result_image = img.copy()
     img_resize = Utils.resize(img)
 #    img_resize, pos = Utils.mkborder(img_resize)
 
     mask = Utils.getMask(img_resize)
+    #print(mask.shape)
+  #  mask = Utils.cleanEdges(mask)
+    dir = Utils.getDir("/home/calazans/Documents/Images_pdi/results/", os.path.splitext(os.path.basename(img_path))[0])
 
-    dir = Utils.getDir("/home/calazans/Downloads/lol/results", os.path.splitext(os.path.basename(img_path))[0])
-
-    print(has,len(backgrounds),img_resize.shape)
+    #print(has,len(backgrounds),img_resize.shape)
 
     rImg = np.ones(img_resize.shape[:2])
+    r_Img = np.zeros(img.shape)
 
     Utils.saveImg(os.path.join(dir, "mask.png"), mask)
 
@@ -107,18 +118,30 @@ for img_path in backgrounds:
     imgs_connected = Utils.getConnectedObjects(rImg)
     i = 0
     features = Features.all_features_batch(imgs_connected)
-    predicted = classifier.predict(features)
+    if(features.shape[0] > 0):
+        predicted = classifier.predict(features)
+    else:
+        predicted = False
     for img_connected in imgs_connected:
         i+=1
         doc_dir = Utils.getDir(dir,"docs")
         others_dir = Utils.getDir(dir,"others")
-
+        h,w  = img.shape[:2]
+        canvas = Features.findContours(img_connected)
+        Utils.saveImg(os.path.join(dir, "finalIMsG.png"), canvas)
+        finalImage = Utils.resize_fixed_size(canvas,(w,h) )
         if predicted[i-1] == 1:
             Utils.saveImg(os.path.join(doc_dir, "img_connected" + str(i) + ".png"), img_connected)
-            canvas = Features.findContours(img_connected)
             Utils.saveImg(os.path.join(doc_dir, "finalIMG" + str(i) + ".png"), canvas)
         else:
             Utils.saveImg(os.path.join(doc_dir, "img_connected" + str(i) + ".png"), img_connected)
-            canvas = Features.findContours(img_connected)
             Utils.saveImg(os.path.join(doc_dir, "finalIMG" + str(i) + ".png"), canvas)
+        result_image = Utils.add(result_image,finalImage)
+        Utils.saveImg(os.path.join(dir, "finalIMG.png"), result_image)
 
+        nImgs_fill = Utils.sub(canvas,Utils.multiFill(canvas))
+        Utils.saveImg(os.path.join(dir, "finaslIMG.png"), nImgs_fill)
+
+        r_Img = Utils.add(r_Img, Utils.resize_fixed_size(nImgs_fill,(w,h) ))
+    finalResult = os.path.join("/home/calazans/Documents/Images_pdi/results/",os.path.splitext(os.path.basename(img_path))[0] + ".png")
+    Utils.saveImg(finalResult, r_Img)

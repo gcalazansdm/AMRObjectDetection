@@ -4,7 +4,7 @@ import cv2
 from Morfology.GeodesicMethods import geoDilatate
 from Morfology.GeodesicMethods import geoErode
 def reconstructionComun(pImg,kernel):
-    img = Utils.normalize(pImg)
+    img = (pImg)
 
     #primeira parte com dilatate
     img=Utils.complement(img)

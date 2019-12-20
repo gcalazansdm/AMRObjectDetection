@@ -12,7 +12,8 @@ def all_features_batch(images):
     return np.array(features)
 
 def all_features(image):
-    pImage = Utils.resize_fixed_size(image,256)
+    pImage = Utils.resize_fixed_size(image, (256,256) )
+    pImage = Utils.normalize(pImage)
     x,y = projection(pImage)
     borders = cBorder(image)
     array = np.concatenate([x, y], axis=None)

@@ -10,26 +10,50 @@ def getKernel(size):
     return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, size)
 
 def complement(pImage):
-    ones = np.ones(pImage.shape)
+    ones = np.ones(pImage.shape) * np.max(pImage)
     return np.subtract(ones,pImage)
 
 def resize(pImage):
     height, width = pImage.shape[:2]
-    ex = max( min( width, height ) / 1000, 1.0 ) * 2
-    print(ex)
+    ex = max( min( width, height ) / 256, 1.0 )
+
     if ex >= 1:
         res = cv2.resize(pImage, (round( width/ex), round(height/ex)), interpolation=cv2.INTER_CUBIC)
     else:
         res = pImage.copy()
     return res
 
+def add(imageA,imageB):
+    if(len(imageB.shape) < 3):
+        imageB = cv2.cvtColor(imageB,cv2.COLOR_GRAY2RGB)
+    if(len(imageA.shape) < 3):
+        imageA = cv2.cvtColor(imageA,cv2.COLOR_GRAY2RGB)
+    (h, w) = imageB.shape[:2]
+    tempImg = Utils.normalize(imageB)
+    rImg = imageA.copy()
+    alpha = np.abs(1.0 - tempImg)
+
+    print(alpha.shape)
+    print(rImg.shape)
+    for c in range(0, 3):
+        rImg[:h, :w,  c] = imageB[:h, :w, c] + rImg[:h, :w,  c]
+
+    return rImg
+
 def resize_fixed_size(pImage,size):
-    res = cv2.resize(pImage, (size, size), interpolation=cv2.INTER_CUBIC)
+    res = cv2.resize(pImage, size, interpolation=cv2.INTER_NEAREST)
     return res
 
-def removeSmallComponents(img):
-    grayImage = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(grayImage,0,255,cv2.THRESH_OTSU)
+def cleanEdges(img):
+    nimg = Utils.toInt8(Utils.normalize(img))
+    ret, thresh = cv2.threshold(nimg, 0, 255, cv2.THRESH_OTSU)
+    no_smalls = removeSmallComponents(thresh)
+    rValue = np.minimum(no_smalls,nimg)
+    return rValue
+
+def removeSmallComponents(thresh):
+#    grayImage = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+ #   ret, thresh = cv2.threshold(grayImage,0,255,cv2.THRESH_OTSU)
 
     connectivity = 8
 
@@ -62,7 +86,7 @@ def getConnectedObjects(img):
     return imgs
 
 def blur(img):
-    dst = cv2.GaussianBlur(img,(5, 5), 0)
+    dst = cv2.GaussianBlur(img,(7, 7), 0)
     return dst
 
 def loadImg(path):
@@ -93,42 +117,26 @@ def binarize_otsu(image):
     _,rValue = cv2.threshold(image, 10, 255, cv2.THRESH_OTSU)
     return rValue
 
-def mkborder(img):
-    borderType = cv2.BORDER_CONSTANT
-    shape = img.shape
-    top = int(0.05 * shape[0])  # shape[0] = rows
-    bottom = top
-    left = int(0.05 * shape[1])  # shape[1] = cols
-    right = left
+def to_gray(image):
+    grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return grayImage
 
-    dst = cv2.copyMakeBorder(img, top, bottom, left, right, borderType, None, [0,0,0])
-    return dst , (top,bottom,left,right)
-
-def crop(img,pos):
-    x,y = img.shape[:2]
-    crop_img = img[pos[0]:x-pos[1],pos[2]:y-pos[2]]
-    return crop_img
-
-def fill(img):
-    # Copy the thresholded image.
-    rValue = img.copy()
-
-    h, w = img.shape[:2]
-    mask = np.zeros((h + 2, w + 2), np.uint8)
-
-    # Floodfill from point (0, 0)
-    cv2.floodFill(rValue, mask, (0, 0), (255,255,255))
-
-    return rValue
 
 def img_and(img,mask):
-    print(img.shape)
-    print(type(img))
-    print(mask.shape)
-    print(type(mask))
     rImg = cv2.bitwise_and(img, mask)
+    return rImg
+
+def img_or(img,mask):
+    if(len(mask.shape) < 3):
+        mask = cv2.cvtColor(mask,cv2.COLOR_GRAY2RGB)
+    print(img.shape, mask.shape)
+    rImg = cv2.bitwise_or(img, mask)
     return rImg
 def sub(img,mask):
     rImg = cv2.bitwise_xor(img, mask)
     rImg = cv2.bitwise_not(rImg)
+    return rImg
+
+def subtraction(img,mask):
+    rImg = cv2.bitwise_and(img, cv2.bitwise_not(mask))
     return rImg
